@@ -17,23 +17,51 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
-      - name: Generate empty APT repository
+      - name: Install repository tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dpkg-dev bzip2
+
+      - name: Generate APT repository
         shell: bash
         run: |
-          mkdir -p public
-          touch public/.nojekyll
-          : > public/Packages
-          gzip -n -k public/Packages
-          bzip2 -k public/Packages
+          set -euo pipefail
 
+          rm -rf public
+          mkdir -p public/debs
+          touch public/.nojekyll
+
+          # 复制仓库根目录中的安装包
+          find . -maxdepth 1 -type f -name '*.deb' \
+            -exec cp -t public/debs -- {} +
+
+          # 复制 debs 文件夹中的安装包
+          if [ -d debs ]; then
+            find debs -maxdepth 1 -type f -name '*.deb' \
+              -exec cp -t public/debs -- {} +
+          fi
+
+          # 生成插件索引及压缩版本
+          (
+            cd public
+            dpkg-scanpackages --multiversion debs /dev/null > Packages
+            gzip -n -k Packages
+            bzip2 -k Packages
+          )
+
+          # 生成 Release 和源首页
           python3 - <<'PY'
           from pathlib import Path
           from datetime import datetime, timezone
@@ -41,6 +69,7 @@ jobs:
           import hashlib
 
           root = Path("public")
+
           release = [
               "Origin: Abyss",
               "Label: Abyss",
@@ -56,6 +85,7 @@ jobs:
           for heading, algorithm in (
               ("MD5Sum", "md5"),
               ("SHA256", "sha256"),
+              ("SHA512", "sha512"),
           ):
               release.append(heading + ":")
               for name in ("Packages", "Packages.gz", "Packages.bz2"):
@@ -64,20 +94,73 @@ jobs:
                   release.append(f" {digest} {len(data)} {name}")
 
           (root / "Release").write_text(
-              "\n".join(release) + "\n", encoding="utf-8"
-          )
-          (root / "index.html").write_text(
-              '<!doctype html><html lang="zh-CN">'
-              '<meta charset="utf-8">'
-              '<meta name="viewport" content="width=device-width,initial-scale=1">'
-              '<title>Abyss 软件源</title>'
-              '<body><h1>Abyss</h1>'
-              '<p>欢迎来到 Abyss 越狱软件源。</p>'
-              '<p>请将当前页面的网址添加到软件包管理器。</p>'
-              '<p>软件源已建立，暂时没有上架插件。</p>'
-              '</body></html>',
+              "\n".join(release) + "\n",
               encoding="utf-8",
           )
+
+          html = """<!doctype html>
+          <html lang="zh-CN">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>Abyss 软件源</title>
+            <style>
+              body {
+                margin: 0;
+                padding: 64px 24px;
+                background: #10121a;
+                color: #eef0ff;
+                font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+                line-height: 1.7;
+              }
+              main {
+                max-width: 640px;
+                margin: auto;
+              }
+              h1 {
+                font-size: 48px;
+                margin-bottom: 12px;
+              }
+              p {
+                color: #bdc3d9;
+              }
+              code {
+                display: block;
+                padding: 16px;
+                border-radius: 12px;
+                background: #1d2130;
+                overflow-wrap: anywhere;
+              }
+              a {
+                display: inline-block;
+                margin: 12px 8px 0 0;
+                padding: 10px 16px;
+                border-radius: 10px;
+                background: #7785ff;
+                color: #fff;
+                text-decoration: none;
+              }
+            </style>
+          </head>
+          <body>
+            <main>
+              <h1>Abyss</h1>
+              <p>欢迎来到 Abyss 越狱软件源。</p>
+              <p>复制以下地址，添加到你的软件包管理器：</p>
+              <code>https://vaynetwd.github.io/abyss/</code>
+              <a href="sileo://source/https://vaynetwd.github.io/abyss/">
+                添加到 Sileo
+              </a>
+              <a href="zbra://sources/add/https://vaynetwd.github.io/abyss/">
+                添加到 Zebra
+              </a>
+              <p>添加后刷新软件源，即可查看已上架插件。</p>
+            </main>
+          </body>
+          </html>
+          """
+
+          (root / "index.html").write_text(html, encoding="utf-8")
           PY
 
       - name: Upload Pages artifact
