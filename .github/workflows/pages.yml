@@ -1,0 +1,90 @@
+name: Publish Abyss
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Generate empty APT repository
+        shell: bash
+        run: |
+          mkdir -p public
+          touch public/.nojekyll
+          : > public/Packages
+          gzip -n -k public/Packages
+          bzip2 -k public/Packages
+
+          python3 - <<'PY'
+          from pathlib import Path
+          from datetime import datetime, timezone
+          from email.utils import format_datetime
+          import hashlib
+
+          root = Path("public")
+          release = [
+              "Origin: Abyss",
+              "Label: Abyss",
+              "Suite: stable",
+              "Codename: abyss",
+              "Version: 1.0",
+              "Architectures: iphoneos-arm iphoneos-arm64 iphoneos-arm64e",
+              "Components: main",
+              "Description: Abyss jailbreak repository",
+              "Date: " + format_datetime(datetime.now(timezone.utc)),
+          ]
+
+          for heading, algorithm in (
+              ("MD5Sum", "md5"),
+              ("SHA256", "sha256"),
+          ):
+              release.append(heading + ":")
+              for name in ("Packages", "Packages.gz", "Packages.bz2"):
+                  data = (root / name).read_bytes()
+                  digest = hashlib.new(algorithm, data).hexdigest()
+                  release.append(f" {digest} {len(data)} {name}")
+
+          (root / "Release").write_text(
+              "\n".join(release) + "\n", encoding="utf-8"
+          )
+          (root / "index.html").write_text(
+              '<!doctype html><html lang="zh-CN">'
+              '<meta charset="utf-8">'
+              '<meta name="viewport" content="width=device-width,initial-scale=1">'
+              '<title>Abyss 软件源</title>'
+              '<body><h1>Abyss</h1>'
+              '<p>欢迎来到 Abyss 越狱软件源。</p>'
+              '<p>请将当前页面的网址添加到软件包管理器。</p>'
+              '<p>软件源已建立，暂时没有上架插件。</p>'
+              '</body></html>',
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
