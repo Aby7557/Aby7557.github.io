@@ -43,17 +43,26 @@ jobs:
           mkdir -p public/debs
           touch public/.nojekyll
 
-          # 复制仓库根目录中的安装包
+          # 复制源图标
+          if [ -f icon.png ]; then
+            cp icon.png public/icon.png
+          fi
+
+          if [ -f CydiaIcon.png ]; then
+            cp CydiaIcon.png public/CydiaIcon.png
+          fi
+
+          # 复制仓库根目录中的 .deb
           find . -maxdepth 1 -type f -name '*.deb' \
             -exec cp -t public/debs -- {} +
 
-          # 复制 debs 文件夹中的安装包
+          # 复制 debs 文件夹中的 .deb
           if [ -d debs ]; then
             find debs -maxdepth 1 -type f -name '*.deb' \
               -exec cp -t public/debs -- {} +
           fi
 
-          # 生成插件索引及压缩版本
+          # 生成软件包索引
           (
             cd public
             dpkg-scanpackages --multiversion debs /dev/null > Packages
@@ -61,7 +70,7 @@ jobs:
             bzip2 -k Packages
           )
 
-          # 生成 Release 和源首页
+          # 生成 Release 文件
           python3 - <<'PY'
           from pathlib import Path
           from datetime import datetime, timezone
@@ -91,7 +100,9 @@ jobs:
               for name in ("Packages", "Packages.gz", "Packages.bz2"):
                   data = (root / name).read_bytes()
                   digest = hashlib.new(algorithm, data).hexdigest()
-                  release.append(f" {digest} {len(data)} {name}")
+                  release.append(
+                      f" {digest} {len(data)} {name}"
+                  )
 
           (root / "Release").write_text(
               "\n".join(release) + "\n",
@@ -105,48 +116,70 @@ jobs:
             <meta name="viewport" content="width=device-width, initial-scale=1">
             <title>Abyss 软件源</title>
             <style>
+              :root {
+                color-scheme: dark;
+              }
+
+              * {
+                box-sizing: border-box;
+              }
+
               body {
                 margin: 0;
                 padding: 64px 24px;
                 background: #10121a;
                 color: #eef0ff;
-                font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+                font-family: -apple-system, BlinkMacSystemFont,
+                  "Segoe UI", sans-serif;
                 line-height: 1.7;
               }
+
               main {
                 max-width: 640px;
-                margin: auto;
+                margin: 0 auto;
               }
+
+              img {
+                width: 96px;
+                height: 96px;
+                border-radius: 22px;
+                object-fit: cover;
+              }
+
               h1 {
+                margin: 24px 0 8px;
                 font-size: 48px;
-                margin-bottom: 12px;
               }
+
               p {
                 color: #bdc3d9;
               }
+
               code {
                 display: block;
                 padding: 16px;
-                border-radius: 12px;
+                border-radius: 10px;
                 background: #1d2130;
                 overflow-wrap: anywhere;
               }
+
               a {
                 display: inline-block;
                 margin: 12px 8px 0 0;
                 padding: 10px 16px;
                 border-radius: 10px;
                 background: #7785ff;
-                color: #fff;
+                color: #ffffff;
                 text-decoration: none;
               }
             </style>
           </head>
           <body>
             <main>
+              <img src="icon.png" alt="Abyss">
               <h1>Abyss</h1>
               <p>欢迎来到 Abyss 越狱软件源。</p>
-              <p>复制以下地址，添加到你的软件包管理器：</p>
+              <p>复制以下地址，添加到软件包管理器：</p>
               <code>https://vaynetwd.github.io/abyss/</code>
               <a href="sileo://source/https://vaynetwd.github.io/abyss/">
                 添加到 Sileo
@@ -160,7 +193,10 @@ jobs:
           </html>
           """
 
-          (root / "index.html").write_text(html, encoding="utf-8")
+          (root / "index.html").write_text(
+              html,
+              encoding="utf-8",
+          )
           PY
 
       - name: Upload Pages artifact
