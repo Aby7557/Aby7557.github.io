@@ -274,7 +274,11 @@ with open(os.path.join(out, "Packages"), "w", encoding="utf-8") as f:
 print("Indexed packages:", len(blocks))
 PYIDX
 
+# Compress and list only what debs/ holds, in the output root: after cd,
+# a bare Packages names the served index, and an index.html in the working
+# directory would make "> Packages" a directory instead of a file.
 cd "$OUT"
+OUT="$(pwd)"
 gzip -9 -n -c Packages > Packages.gz
 xz -9 -c Packages > Packages.xz
 if command -v bzip2 >/dev/null 2>&1; then
@@ -289,7 +293,7 @@ from email.utils import format_datetime
 from pathlib import Path
 
 root, origin, label, codename, source_url = sys.argv[1:6]
-root = Path(root)
+root = Path(root).resolve()
 
 architectures = set()
 for block in (root / "Packages").read_text(encoding="utf-8", errors="replace").split("\n\n"):
