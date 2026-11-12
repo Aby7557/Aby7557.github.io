@@ -267,6 +267,8 @@ for name in sorted(os.listdir(debs_dir)):
         fields["Depiction"] = f"https://aby7557.github.io/depictions/{package_id}/"
     if depiction_dir and os.path.isfile(os.path.join(depiction_dir, "depiction.json")):
         fields["Sileodepiction"] = f"https://aby7557.github.io/depictions/{package_id}/depiction.json"
+    if depiction_dir and os.path.isfile(os.path.join(depiction_dir, "icon.png")):
+        fields["Icon"] = f"https://aby7557.github.io/depictions/{package_id}/icon.png"
 
     first = ["Package", "Version", "Architecture", "Maintainer", "Installed-Size",
              "Pre-Depends", "Depends", "Recommends", "Suggests", "Conflicts",
