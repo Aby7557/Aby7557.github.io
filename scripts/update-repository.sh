@@ -260,6 +260,14 @@ for name in sorted(os.listdir(debs_dir)):
     fields["SHA1"] = hashlib.sha1(data).hexdigest()
     fields["SHA256"] = hashlib.sha256(data).hexdigest()
 
+    # Link optional depiction files without modifying or repacking the deb.
+    package_id = fields.get("Package")
+    depiction_dir = os.path.join(out, "depictions", package_id) if package_id else ""
+    if depiction_dir and os.path.isfile(os.path.join(depiction_dir, "index.html")):
+        fields["Depiction"] = f"https://aby7557.github.io/depictions/{package_id}/"
+    if depiction_dir and os.path.isfile(os.path.join(depiction_dir, "depiction.json")):
+        fields["Sileodepiction"] = f"https://aby7557.github.io/depictions/{package_id}/depiction.json"
+
     first = ["Package", "Version", "Architecture", "Maintainer", "Installed-Size",
              "Pre-Depends", "Depends", "Recommends", "Suggests", "Conflicts",
              "Breaks", "Replaces", "Provides", "Filename", "Size", "MD5sum",
