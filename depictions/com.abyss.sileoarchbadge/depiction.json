@@ -32,6 +32,21 @@
           "text" : "mobilesubstrate"
         }
       ]
+    },
+    {
+      "tabname" : "更新记录",
+      "class" : "DepictionStackView",
+      "views" : [
+        {
+          "class" : "DepictionSubheaderView",
+          "title" : "1.1"
+        },
+        {
+          "class" : "DepictionMarkdownView",
+          "useSpacing" : true,
+          "markdown" : "%"
+        }
+      ]
     }
   ],
   "class" : "DepictionTabView",
