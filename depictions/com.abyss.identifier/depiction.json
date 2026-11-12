@@ -1,0 +1,39 @@
+{
+  "icon" : "https:\/aby7557.github.io\/depictions\/com.abyss.identifier\/icon.png",
+  "tabs" : [
+    {
+      "tabname" : "详情",
+      "class" : "DepictionStackView",
+      "views" : [
+        {
+          "class" : "DepictionHeaderView",
+          "title" : "Sileo架构指示条"
+        },
+        {
+          "class" : "DepictionMarkdownView",
+          "useSpacing" : true,
+          "markdown" : "复刻刀刀版sileo 在 Sileo 插件列表左侧显示架构指示条：arm64e 绿、arm64 蓝"
+        },
+        {
+          "class" : "DepictionSeparatorView"
+        },
+        {
+          "class" : "DepictionHeaderView",
+          "title" : "插件信息"
+        },
+        {
+          "class" : "DepictionTableTextView",
+          "title" : "版本",
+          "text" : "1.1"
+        },
+        {
+          "class" : "DepictionTableTextView",
+          "title" : "依赖",
+          "text" : "mobilesubstrate"
+        }
+      ]
+    }
+  ],
+  "class" : "DepictionTabView",
+  "minVersion" : "0.4"
+}
