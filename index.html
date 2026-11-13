@@ -1,52 +1,287 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Abyss 软件源</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Abyss自用越狱源</title>
+  <meta name="description" content="Abyss 自用 iOS 越狱软件源，支持 Sileo 和 Irisin。">
+  <meta name="theme-color" content="#0f3460">
   <style>
-    :root { color-scheme: dark; }
+    :root {
+      --background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      --card: rgba(255, 255, 255, 0.08);
+      --border: rgba(255, 255, 255, 0.12);
+      --input: rgba(0, 0, 0, 0.28);
+      --text: #ffffff;
+      --secondary: rgba(255, 255, 255, 0.68);
+      --muted: rgba(255, 255, 255, 0.45);
+      --accent: #4fc3f7;
+      --accent-soft: rgba(79, 195, 247, 0.18);
+      --shadow: rgba(0, 0, 0, 0.22);
+    }
+
+    :root.light {
+      --background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 50%, #d7e3f4 100%);
+      --card: rgba(255, 255, 255, 0.78);
+      --border: rgba(0, 0, 0, 0.08);
+      --input: rgba(0, 0, 0, 0.06);
+      --text: #1a1a2e;
+      --secondary: rgba(0, 0, 0, 0.64);
+      --muted: rgba(0, 0, 0, 0.42);
+      --accent: #007aff;
+      --accent-soft: rgba(0, 122, 255, 0.12);
+      --shadow: rgba(0, 0, 0, 0.1);
+    }
+
     * { box-sizing: border-box; }
-    body {
+
+    html, body {
       margin: 0;
-      padding: 64px 24px;
-      background: #10121a;
-      color: #eef0ff;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      line-height: 1.7;
+      min-width: 100%;
+      min-height: 100%;
+      overflow-x: hidden;
     }
-    main { max-width: 640px; margin: 0 auto; }
-    img { width: 96px; height: 96px; border-radius: 22px; object-fit: cover; }
-    h1 { margin: 24px 0 8px; font-size: 48px; }
-    p { color: #bdc3d9; }
-    code {
-      display: block;
-      padding: 16px;
-      border-radius: 10px;
-      background: #1d2130;
-      overflow-wrap: anywhere;
+
+    body {
+      padding: 20px;
+      color: var(--text);
+      background: var(--background);
+      background-attachment: fixed;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      transition: background 0.3s, color 0.3s;
     }
-    a {
-      display: inline-block;
-      margin: 12px 8px 0 0;
-      padding: 10px 16px;
+
+    .container {
+      width: 100%;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+
+    .header {
+      padding: 28px 0 22px;
+      text-align: center;
+    }
+
+    .header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .header-spacer { width: 44px; }
+
+    .header h1 {
+      margin: 0;
+      color: var(--text);
+      font-size: 28px;
+      font-weight: 700;
+    }
+
+    .header p {
+      margin: 8px 0 0;
+      color: var(--secondary);
+      font-size: 14px;
+    }
+
+    .theme-toggle {
+      width: 44px;
+      height: 44px;
+      padding: 0;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      color: var(--text);
+      background: var(--card);
+      font-size: 18px;
+      cursor: pointer;
+    }
+
+    .card {
+      margin-bottom: 16px;
+      padding: 20px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: var(--card);
+      box-shadow: 0 12px 30px var(--shadow);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
+
+    .card-title {
+      margin-bottom: 16px;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .card-title span {
+      margin-right: 8px;
+      color: var(--accent);
+    }
+
+    .source-url {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+      padding: 12px 14px;
       border-radius: 10px;
-      background: #7785ff;
+      background: var(--input);
+    }
+
+    .source-url code {
+      flex: 1;
+      min-width: 0;
+      color: var(--accent);
+      font-family: "SF Mono", Monaco, monospace;
+      font-size: 14px;
+      word-break: break-all;
+    }
+
+    button, .action-button {
+      border: 0;
+      cursor: pointer;
+      font: inherit;
+    }
+
+    .copy-button {
+      min-width: 76px;
+      min-height: 40px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      color: #ffffff;
+      background: var(--accent);
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .action-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .action-button {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 48px;
+      padding: 13px 14px;
+      border-radius: 12px;
       color: #ffffff;
       text-decoration: none;
+      font-size: 15px;
+      font-weight: 600;
+      transition: transform 0.2s, filter 0.2s;
+    }
+
+    .action-button:hover {
+      filter: brightness(1.08);
+      transform: translateY(-1px);
+    }
+
+    .sileo { background: linear-gradient(135deg, #007aff, #5856d6); }
+    .irisin { background: linear-gradient(135deg, #34c759, #30d158); }
+    .zebra { background: linear-gradient(135deg, #6b5cff, #9b59b6); }
+
+    .notice {
+      margin: 0;
+      color: var(--secondary);
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    .footer {
+      padding: 18px 0 8px;
+      color: var(--muted);
+      font-size: 13px;
+      text-align: center;
+    }
+
+    .footer a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    @media (max-width: 380px) {
+      body { padding: 14px; }
+      .header h1 { font-size: 24px; }
+      .card { padding: 16px; }
+      .source-url { align-items: stretch; flex-direction: column; }
+      .copy-button { width: 100%; }
     }
   </style>
 </head>
 <body>
-  <main>
-    <img src="CydiaIcon.png" alt="Abyss">
-    <h1>Abyss</h1>
-    <p>欢迎来到 Abyss 越狱软件源。</p>
-    <p>复制以下地址，添加到软件包管理器：</p>
-    <code>https://aby7557.github.io</code>
-    <a href="sileo://source/https://aby7557.github.io">添加到 Sileo</a>
-    <a href="zbra://sources/add/https://aby7557.github.io">添加到 Zebra</a>
-    <p>添加后刷新软件源，即可查看已上架插件。</p>
+  <main class="container">
+    <header class="header">
+      <div class="header-top">
+        <div class="header-spacer" aria-hidden="true"></div>
+        <h1>Abyss自用越狱源</h1>
+        <button class="theme-toggle" type="button" onclick="toggleTheme()" aria-label="切换主题">☾</button>
+      </div>
+      <p>iOS 越狱软件源</p>
+    </header>
+
+    <section class="card">
+      <div class="card-title"><span>↗</span>插件源地址</div>
+      <div class="source-url">
+        <code id="repoUrl">https://aby7557.github.io/</code>
+        <button class="copy-button" type="button" onclick="copySource()">复制</button>
+      </div>
+      <div class="action-buttons">
+        <a class="action-button sileo" href="sileo://source/https://aby7557.github.io/">↓&nbsp; 添加到 Sileo</a>
+        <a class="action-button irisin" href="irisin://repository/add?url=https://aby7557.github.io/">↓&nbsp; 添加到 Irisin</a>
+        <a class="action-button zebra" href="zbra://sources/add/https://aby7557.github.io/">↓&nbsp; 添加到 Zebra</a>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-title"><span>ⓘ</span>使用说明</div>
+      <p class="notice">复制上面的源地址，或点击对应按钮添加到软件包管理器。添加后刷新软件源即可。</p>
+    </section>
+
+    <section class="card">
+      <div class="card-title"><span>⚠</span>免责声明</div>
+      <p class="notice">本源为个人学习和自用分享用途，包的版权及责任归原作者所有。越狱及安装第三方软件存在风险，请在安装前自行备份并评估。</p>
+    </section>
+
+    <footer class="footer">
+      <a href="https://aby7557.github.io">Abyss自用越狱源</a><br>
+      GitHub Pages
+    </footer>
   </main>
+
+  <script>
+    const root = document.documentElement;
+    const savedTheme = localStorage.getItem('abyss-theme');
+    if (savedTheme === 'light') root.classList.add('light');
+
+    function toggleTheme() {
+      root.classList.toggle('light');
+      localStorage.setItem('abyss-theme', root.classList.contains('light') ? 'light' : 'dark');
+    }
+
+    function showMessage(message) {
+      const button = document.querySelector('.copy-button');
+      const oldText = button.textContent;
+      button.textContent = message;
+      setTimeout(() => { button.textContent = oldText; }, 1600);
+    }
+
+    function copySource() {
+      const url = document.getElementById('repoUrl').textContent;
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(url).then(() => showMessage('已复制'));
+        return;
+      }
+      const input = document.createElement('textarea');
+      input.value = url;
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand('copy');
+      input.remove();
+      showMessage('已复制');
+    }
+  </script>
 </body>
 </html>
