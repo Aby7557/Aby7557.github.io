@@ -3,7 +3,7 @@
 
 <img src="https://aby7557.github.io/CydiaIcon.png" width="120" alt="Abyss 软件源图标" />
 
-#  Abyss自用越狱源
+#  Abyss
 
 **自用越狱软件源，包内容以仓库实际文件为准。**
 
