@@ -3,14 +3,7 @@
 
 <img src="https://aby7557.github.io/CydiaIcon.png" width="120" alt="Abyss 软件源图标" />
 
-# 💫 Abyss自用越狱源
-
-<img src="https://readme-typing-svg.demolab.com/?font=Fira+Code&weight=600&size=24&pause=1000&color=4FC3F7&center=true&vCenter=true&width=620&height=50&random=false&lines=Abyss+Repo;自用越狱软件源;RootHide+%C2%B7+arm64e" alt="Abyss Repo" />
-
-<img src="https://img.shields.io/badge/包文件-42-4FC3F7?style=for-the-badge" alt="42 个包文件" />
-<img src="https://img.shields.io/badge/唯一包条目-41-30363D?style=for-the-badge" alt="41 个唯一包条目" />
-<img src="https://img.shields.io/badge/arm64e-34C759?style=for-the-badge" alt="arm64e" />
-<img src="https://img.shields.io/badge/arm64%20%C2%B7%20arm-FF9F0A?style=for-the-badge" alt="arm64 and arm" />
+#  Abyss自用越狱源
 
 **自用越狱软件源，包内容以仓库实际文件为准。**
 
