@@ -343,4 +343,36 @@ for heading, algorithm in (
 
 (root / "Release").write_text("\n".join(release) + "\n", encoding="utf-8")
 print("Release written for", " ".join(sorted(architectures)))
+
+# Serve distribution-style sources alongside the flat ./ source.
+import bz2
+import gzip
+import lzma
+for suite in ("stable", codename):
+    dist = root / "dists" / suite
+    entries = []
+    for arch in sorted(architectures):
+        target = dist / "main" / ("binary-" + arch)
+        target.mkdir(parents=True, exist_ok=True)
+        blocks = []
+        for block in (root / "Packages").read_text(encoding="utf-8").split("\n\n"):
+            fields = dict(line.split(": ", 1) for line in block.splitlines()
+                          if ": " in line and not line.startswith(" "))
+            if fields.get("Architecture") in (arch, "all"):
+                blocks.append(block.strip())
+        data = (("\n\n".join(blocks) + "\n\n") if blocks else "").encode("utf-8")
+        variants = {"Packages": data, "Packages.gz": gzip.compress(data, mtime=0),
+                    "Packages.bz2": bz2.compress(data), "Packages.xz": lzma.compress(data)}
+        for name, content in variants.items():
+            path = target / name
+            path.write_bytes(content)
+            entries.append((path.relative_to(dist).as_posix(), content))
+    header = release[:next(i for i, line in enumerate(release) if line == "MD5Sum:")]
+    for heading, algorithm in (("MD5Sum", "md5"), ("SHA1", "sha1"),
+                               ("SHA256", "sha256"), ("SHA512", "sha512")):
+        header.append(heading + ":")
+        for name, data in entries:
+            header.append(f" {hashlib.new(algorithm, data).hexdigest()} {len(data):>16} {name}")
+    (dist / "Release").write_text("\n".join(header) + "\n", encoding="utf-8")
+    print("Distribution written:", suite)
 PY
