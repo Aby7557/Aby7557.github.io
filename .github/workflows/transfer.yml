@@ -1,0 +1,96 @@
+name: Cloud transfer deb
+
+"on":
+  workflow_dispatch:
+    inputs:
+      files:
+        description: "JSON array of {url, filename}"
+        required: true
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  transfer:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download and commit
+        shell: bash
+        env:
+          FILES: ${{ inputs.files }}
+        run: |
+          set -euo pipefail
+          echo "$FILES" | jq -e 'type == "array" and length > 0 and length <= 20' > /dev/null
+          mkdir -p debs
+          changed=0
+          while IFS= read -r item; do
+            url=$(jq -r '.url // empty' <<< "$item")
+            fallback=$(jq -r '.filename // empty' <<< "$item")
+            if [ -z "$url" ] || [ -z "$fallback" ]; then echo "missing url or filename"; exit 1; fi
+            case "$fallback" in
+              *.deb) ;;
+              *) echo "not a .deb: $fallback"; exit 1 ;;
+            esac
+            tmp=$(mktemp --suffix=.deb)
+            curl -fsSL --retry 3 --max-filesize 41943040 -o "$tmp" "$url"
+            [ "$(stat -c%s "$tmp")" -le 41943040 ]
+            head -c 8 "$tmp" | grep -q '^!<arch>$'
+            pkg=$(sudo dpkg-deb -f "$tmp" Package 2>/dev/null || true)
+            version=$(sudo dpkg-deb -f "$tmp" Version 2>/dev/null || true)
+            arch=$(sudo dpkg-deb -f "$tmp" Architecture 2>/dev/null || true)
+            if [ -n "$pkg" ] && [ -n "$version" ] && [ -n "$arch" ]; then
+              safe=$(printf '%s_%s_%s.deb' "$pkg" "$version" "$arch" | tr '/ :' '___' | tr -cd 'A-Za-z0-9._+-')
+              dest="debs/$safe"
+            else
+              dest="debs/$fallback"
+            fi
+            if [ -e "$dest" ]; then
+              echo "skip existing: $dest"
+              rm -f "$tmp"
+              continue
+            fi
+            mv "$tmp" "$dest"
+            changed=1
+            echo "downloaded: $dest"
+          done < <(jq -c '.[]' <<< "$FILES")
+          if [ "$changed" -eq 0 ]; then
+            echo "no new files"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add debs
+          git commit -m "Cloud transfer $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+      - uses: actions/configure-pages@v5
+      - name: Build package index
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y dpkg-dev bzip2
+          mkdir -p public/debs
+          touch public/.nojekyll
+          cp -f debs/*.deb public/debs/ 2>/dev/null || true
+          cp -f icon.png CydiaIcon.png public/ 2>/dev/null || true
+          cd public
+          sudo dpkg-scanpackages --multiversion debs /dev/null > Packages
+          gzip -n -k Packages
+          bzip2 -k Packages
+          printf 'Origin: %s\nLabel: %s\nSuite: stable\nCodename: sileo\nArchitectures: iphoneos-arm64 iphoneos-arm64e\nComponents: main\nDescription: %s\n' "${GITHUB_REPOSITORY##*/}" "${GITHUB_REPOSITORY##*/}" "${GITHUB_REPOSITORY##*/}" > Release
+          printf '<!doctype html><meta charset=utf-8><meta name=viewport content=width=device-width><title>%s</title><h1>%s</h1><p>添加此地址到 Sileo。</p>' "${GITHUB_REPOSITORY##*/}" "${GITHUB_REPOSITORY##*/}" > index.html
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+      - uses: actions/deploy-pages@v4
+        id: deployment
