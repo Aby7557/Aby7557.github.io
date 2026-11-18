@@ -1,3 +1,5 @@
+# RepoMgr-Transfer-API: 1
+# RepoMgr-Transfer-Template: 2
 name: Cloud transfer deb
 
 "on":
@@ -79,16 +81,22 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y dpkg-dev bzip2
+          rm -rf public
           mkdir -p public/debs
+          rsync -a --exclude="/public/" --exclude="/.git/" --exclude="/.github/" ./ public/
           touch public/.nojekyll
-          cp -f debs/*.deb public/debs/ 2>/dev/null || true
           cp -f icon.png CydiaIcon.png public/ 2>/dev/null || true
           cd public
-          sudo dpkg-scanpackages --multiversion debs /dev/null > Packages
+          dpkg-scanpackages --multiversion debs /dev/null > Packages
+          rm -f Packages.gz Packages.bz2
           gzip -n -k Packages
           bzip2 -k Packages
-          printf 'Origin: %s\nLabel: %s\nSuite: stable\nCodename: sileo\nArchitectures: iphoneos-arm64 iphoneos-arm64e\nComponents: main\nDescription: %s\n' "${GITHUB_REPOSITORY##*/}" "${GITHUB_REPOSITORY##*/}" "${GITHUB_REPOSITORY##*/}" > Release
-          printf '<!doctype html><meta charset=utf-8><meta name=viewport content=width=device-width><title>%s</title><h1>%s</h1><p>添加此地址到 Sileo。</p>' "${GITHUB_REPOSITORY##*/}" "${GITHUB_REPOSITORY##*/}" > index.html
+          if [ ! -f Release ]; then
+            printf 'Origin: %s\nLabel: %s\nSuite: stable\nCodename: sileo\nArchitectures: iphoneos-arm64 iphoneos-arm64e\nComponents: main\nDescription: %s\n' "${GITHUB_REPOSITORY##*/}" "${GITHUB_REPOSITORY##*/}" "${GITHUB_REPOSITORY##*/}" > Release
+          fi
+          if [ ! -f index.html ]; then
+            printf '<!doctype html><meta charset=utf-8><meta name=viewport content=width=device-width><title>%s</title><h1>%s</h1><p>添加此地址到 Sileo。</p>' "${GITHUB_REPOSITORY##*/}" "${GITHUB_REPOSITORY##*/}" > index.html
+          fi
       - uses: actions/upload-pages-artifact@v3
         with:
           path: public
