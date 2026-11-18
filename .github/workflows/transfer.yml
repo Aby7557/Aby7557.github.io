@@ -1,5 +1,5 @@
 # RepoMgr-Transfer-API: 1
-# RepoMgr-Transfer-Template: 2
+# RepoMgr-Transfer-Template: 3
 name: Cloud transfer deb
 
 "on":
@@ -81,6 +81,11 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y dpkg-dev bzip2
+          # Keep the repository's own identity, checksums and layout when it has an indexer.
+          if [ -f scripts/update-repository.sh ]; then
+            bash scripts/update-repository.sh "$GITHUB_WORKSPACE/public"
+            exit 0
+          fi
           rm -rf public
           mkdir -p public/debs
           rsync -a --exclude="/public/" --exclude="/.git/" --exclude="/.github/" ./ public/
