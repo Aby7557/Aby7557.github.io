@@ -1,12 +1,11 @@
 {
   "class": "FeaturedBannersView",
-  "itemSize": "{320, 136}",
+  "itemSize": "{360, 153}",
   "itemCornerRadius": 20,
   "banners": [
     {
       "url": "https://aby7557.github.io/shouyedingbu.jpg",
       "title": "",
-      "package": "com.abyss.repomgr",
       "hideShadow": true
     }
   ]
