@@ -324,7 +324,7 @@ release = [
     "Description: Abyss jailbreak repository",
     f"Date: {format_datetime(datetime.now(timezone.utc))}",
     f"Support: {source_url}",
-    f"Banner: {source_url}/shouyedingbu.jpg",
+
 ]
 
 for heading, algorithm in (
