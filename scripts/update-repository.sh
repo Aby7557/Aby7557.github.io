@@ -16,7 +16,7 @@ mkdir -p "$OUT/debs"
 
 # Pages serves these as they are.
 touch "$OUT/.nojekyll"
-for f in index.html CydiaIcon.png sileo-featured.json; do
+for f in index.html CydiaIcon.png shouyedingbu.jpg sileo-featured.json; do
     [ -f "$ROOT/$f" ] && cp "$ROOT/$f" "$OUT/$f"
 done
 if [ -d "$ROOT/depictions" ]; then
@@ -324,6 +324,7 @@ release = [
     "Description: Abyss jailbreak repository",
     f"Date: {format_datetime(datetime.now(timezone.utc))}",
     f"Support: {source_url}",
+    f"Banner: {source_url}/shouyedingbu.jpg",
 ]
 
 for heading, algorithm in (
