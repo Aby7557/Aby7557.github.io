@@ -1,5 +1,5 @@
 # RepoMgr-Transfer-API: 1
-# RepoMgr-Transfer-Template: 9
+# RepoMgr-Transfer-Template: 10
 name: Cloud transfer deb
 run-name: "RepoMgr ${{ inputs.task_id }}"
 
@@ -31,6 +31,16 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Enforce publication branch
+        shell: bash
+        env:
+          PUBLICATION_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_REF_TYPE" != branch ] || [ "$GITHUB_REF_NAME" != "$PUBLICATION_BRANCH" ]; then
+            echo 'Cloud transfer is only allowed on the default publication branch; no files were transferred or deployed.' | tee -a "$GITHUB_STEP_SUMMARY" >&2
+            exit 1
+          fi
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ github.ref_name }}
@@ -67,9 +77,12 @@ jobs:
               for _ in range(6):
                   host,ip=public_url(url)
                   pin='['+ip+']' if ':' in ip else ip
-                  done=subprocess.run(['curl','--disable','-fsS','--proto','=https','--noproxy','*','--resolve',host+':443:'+pin,'--connect-timeout','15','--max-time','90','--max-filesize','41943040','--output',tmp,'--write-out','%{http_code}\n%{redirect_url}','--',url],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+                  done=subprocess.run(['curl','--disable','-fsS','--proto','=https','--noproxy','*','--resolve',host+':443:'+pin,'--connect-timeout','15','--max-time','90','--max-filesize','41943040','--output',tmp,'--write-out','%{http_code}\n%header{cf-mitigated}\n%{redirect_url}','--',url],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+                  status,_,metadata=done.stdout.partition('\n')
+                  mitigation,_,redirect=metadata.partition('\n')
+                  if mitigation.strip().lower()=='challenge': raise ValueError('cloudflare_challenge')
+                  if status=='403': raise ValueError('http_forbidden')
                   if done.returncode: raise ValueError('download_failed')
-                  status,_,redirect=done.stdout.partition('\n')
                   if status in ('301','302','303','307','308') and redirect:
                       url=urljoin(url,redirect.strip()); continue
                   if status!='200': raise ValueError('download_failed')
@@ -103,7 +116,7 @@ jobs:
                           result['status']='skipped'
                       else: dest.write_bytes(data); result['status']='success'
                   except Exception as error:
-                      allowed={'unsafe_url','dns_failed','download_failed','redirect_limit','invalid_input','invalid_filename','invalid_sha256','invalid_archive','checksum_mismatch','invalid_control','filename_conflict'}
+                      allowed={'unsafe_url','dns_failed','download_failed','cloudflare_challenge','http_forbidden','redirect_limit','invalid_input','invalid_filename','invalid_sha256','invalid_archive','checksum_mismatch','invalid_control','filename_conflict'}
                       result['error']=str(error) if isinstance(error,ValueError) and str(error) in allowed else 'transfer_failed'
                   finally:
                       if tmp: Path(tmp).unlink(missing_ok=True)
@@ -137,28 +150,42 @@ jobs:
           [ "$pushed" = true ] || { echo 'Repository changed repeatedly; retry the task.' >&2; exit 1; }
       - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
         id: pages
-        if: steps.transfer.outputs.has_changes == 'true'
+        if: github.ref_type == 'branch' && github.ref_name == github.event.repository.default_branch && steps.transfer.outputs.has_changes == 'true'
       - name: Build package index
         env:
           REPOMGR_PAGES_URL: ${{ steps.pages.outputs.base_url }}
-        if: steps.transfer.outputs.has_changes == 'true'
+          REPOMGR_SIGNING_KEY: ${{ secrets.REPOMGR_SIGNING_KEY }}
+          REPOMGR_SIGNING_PASSPHRASE: ${{ secrets.REPOMGR_SIGNING_PASSPHRASE }}
+          REPOMGR_SIGNING_FINGERPRINT: ${{ vars.REPOMGR_SIGNING_FINGERPRINT }}
+        if: github.ref_type == 'branch' && github.ref_name == github.event.repository.default_branch && steps.transfer.outputs.has_changes == 'true'
         shell: bash
         run: |
-          set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y dpkg-dev bzip2
-          # Keep the repository's own identity, checksums and layout when it has an indexer.
-          if [ -f scripts/update-repository.sh ]; then
-            bash scripts/update-repository.sh "$GITHUB_WORKSPACE/public"
-            exit 0
-          fi
+          sudo apt-get install -y dpkg-dev bzip2 zstd gnupg
+          #!/usr/bin/env bash
+          # Shared publisher source. Both YAML templates embed this verbatim so remote
+          # installers still need only the workflow, never an additional repository file.
+          # Custom indexer protocol: scripts/update-repository.sh ABSOLUTE_OUTPUT_DIRECTORY
+          # runs from the checkout and must create public/Packages and all site assets.
+          # Its index/layout is authoritative; common compression, Release and signing
+          # finalization below is mandatory for both publication entry points.
+          set -euo pipefail
+          export REPOMGR_SOURCE_ROOT="$PWD"
           rm -rf public
-          mkdir -p public/debs
-          rsync -a --exclude="/public/" --exclude="/.git/" --exclude="/.github/" --exclude="/.repomgr-results/" ./ public/
-          touch public/.nojekyll
-          cp -f icon.png CydiaIcon.png public/ 2>/dev/null || true
-          cd public
-          dpkg-scanpackages --multiversion debs /dev/null > Packages
+          if [ -f scripts/update-repository.sh ]; then
+            bash scripts/update-repository.sh "$PWD/public"
+          else
+            mkdir -p public/debs
+            rsync -a --exclude="/public/" --exclude="/.git/" --exclude="/.github/" --exclude="/.repomgr-results/" --exclude="/.review-fixes/" --exclude="/.optimization-fixes/" --exclude="/.gitignore" --exclude="/.gitattributes" ./ public/
+            touch public/.nojekyll
+            cp -f icon.png CydiaIcon.png public/ 2>/dev/null || true
+            (
+            cd public
+            if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+              sudo -n dpkg-scanpackages --multiversion debs /dev/null > Packages
+            else
+              dpkg-scanpackages --multiversion debs /dev/null > Packages
+            fi
           python3 - <<'PYMETADATA'
           import json,re,os
           from urllib.parse import urljoin
@@ -183,17 +210,106 @@ jobs:
               output.append(stanza)
           Path('Packages').write_text('\n\n'.join(output)+'\n\n')
           PYMETADATA
-          rm -f Packages.gz Packages.bz2
-          gzip -n -k Packages
-          bzip2 -k Packages
-          if [ ! -f Release ]; then
-            printf 'Origin: %s\nLabel: %s\nSuite: stable\nCodename: sileo\nArchitectures: iphoneos-arm64 iphoneos-arm64e\nComponents: main\nDescription: %s\n' "${GITHUB_REPOSITORY##*/}" "${GITHUB_REPOSITORY##*/}" "${GITHUB_REPOSITORY##*/}" > Release
+            )
           fi
+          cd public
+          [ -f Packages ] && [ ! -L Packages ] || { echo 'Indexer must produce public/Packages' >&2; exit 1; }
+          touch .nojekyll
+          # Always regenerate compressed variants, including ones copied from an old source.
+          python3 - <<'PYRELEASE'
+          import bz2, gzip, hashlib, lzma, os, re, subprocess, tempfile
+          from datetime import datetime, timezone
+          from email.utils import format_datetime
+          from pathlib import Path
+          root=Path('.')
+          source=Path(os.environ['REPOMGR_SOURCE_ROOT'])
+          signed=any((base/name).exists() for base in (root,source) for name in ('InRelease','Release.gpg'))
+          key=os.environ.get('REPOMGR_SIGNING_KEY','')
+          if signed and not key.strip():
+              raise SystemExit('Signed repository requires REPOMGR_SIGNING_KEY (and optional REPOMGR_SIGNING_PASSPHRASE); refusing stale signatures')
+          # Root Packages is the shared indexer contract. Reject unsupported variants rather
+          # than publishing an old index with freshly calculated (but misleading) hashes.
+          data=Path('Packages').read_bytes()
+          Path('Packages.gz').write_bytes(gzip.compress(data,mtime=0))
+          Path('Packages.bz2').write_bytes(bz2.compress(data))
+          for suffix,fmt in (('xz',lzma.FORMAT_XZ),('lzma',lzma.FORMAT_ALONE)):
+              p=Path('Packages.'+suffix)
+              if p.exists(): p.write_bytes(lzma.compress(data,format=fmt))
+          if Path('Packages.zst').exists():
+              subprocess.run(['zstd','-q','-f','Packages','-o','Packages.zst'],check=True)
+          release=Path('Release')
+          old=release if release.is_file() else source/'Release'
+          text=old.read_text(encoding='utf-8') if old.is_file() else ''
+          # InRelease-only repositories still have identity metadata worth preserving.
+          if not text:
+              inline=next((base/'InRelease' for base in (root,source) if (base/'InRelease').is_file()),None)
+              if inline:
+                  armored=inline.read_text(encoding='utf-8')
+                  if '\n\n' not in armored or '\n-----BEGIN PGP SIGNATURE-----' not in armored:
+                      raise SystemExit('Malformed existing InRelease')
+                  text=armored.split('\n\n',1)[1].split('\n-----BEGIN PGP SIGNATURE-----',1)[0]
+                  text='\n'.join(line[2:] if line.startswith('- ') else line for line in text.splitlines())
+          identity=[]; skip=False; seen=set()
+          for line in text.splitlines():
+              if line.startswith((' ','\t')):
+                  if not skip:
+                      if not identity: raise SystemExit('Malformed Release continuation')
+                      identity.append(line)
+                  continue
+              if not line.strip(): continue
+              match=re.fullmatch(r'([A-Za-z0-9-]+):[ \t]*(.*)',line)
+              if not match: raise SystemExit('Malformed Release field')
+              field=match[1].lower()
+              if field in seen: raise SystemExit('Duplicate Release field: '+field)
+              seen.add(field)
+              skip=field in ('md5sum','sha1','sha256','sha512','date')
+              if not skip: identity.append(line)
+          if not identity:
+              name=os.environ.get('GITHUB_REPOSITORY','repository').rsplit('/',1)[-1]
+              identity=[f'Origin: {name}',f'Label: {name}','Suite: stable','Codename: sileo','Architectures: iphoneos-arm64 iphoneos-arm64e','Components: main',f'Description: {name}']
+          identity.append('Date: '+format_datetime(datetime.now(timezone.utc),usegmt=True))
+          # Hash repository index files, never Release itself, signatures, packages or assets.
+          indexes=[]
+          for p in sorted(root.rglob('*')):
+              if p.is_file() and re.fullmatch(r'(?:Packages|Sources|Contents-[A-Za-z0-9_-]+|Translation-[A-Za-z0-9_-]+)(?:\.(?:gz|bz2|xz|lzma|zst))?',p.name):
+                  if p.is_symlink(): raise SystemExit('Symlink index not allowed')
+                  indexes.append((p.as_posix(),p.read_bytes()))
+          for field,algorithm in (('MD5Sum','md5'),('SHA1','sha1'),('SHA256','sha256'),('SHA512','sha512')):
+              identity.append(field+':')
+              for name,content in indexes:
+                  identity.append(f' {hashlib.new(algorithm,content).hexdigest()} {len(content)} {name}')
+          release.write_text('\n'.join(identity)+'\n',encoding='utf-8')
+          for name in ('InRelease','Release.gpg'):
+              Path(name).unlink(missing_ok=True)
+          if key.strip():
+              # A private temporary keyring avoids shared runner state and key leakage.
+              with tempfile.TemporaryDirectory(prefix='repomgr-gpg-') as home:
+                  os.chmod(home,0o700)
+                  env=dict(os.environ,GNUPGHOME=home)
+                  subprocess.run(['gpg','--batch','--import'],input=key.encode(),env=env,check=True,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,timeout=90)
+                  listing=subprocess.check_output(['gpg','--batch','--with-colons','--list-secret-keys'],env=env,text=True,timeout=90)
+                  fingerprints=[]; primary=False
+                  for line in listing.splitlines():
+                      fields=line.split(':')
+                      if fields[0]=='sec': primary=True
+                      elif fields[0]=='ssb': primary=False
+                      elif fields[0]=='fpr' and primary:
+                          fingerprints.append(fields[9]); primary=False
+                  fingerprint=os.environ.get('REPOMGR_SIGNING_FINGERPRINT','').strip()
+                  if fingerprint:
+                      if fingerprint not in fingerprints: raise SystemExit('Configured signing fingerprint not present')
+                  elif len(fingerprints)==1: fingerprint=fingerprints[0]
+                  else: raise SystemExit('Configure exactly one signing key or REPOMGR_SIGNING_FINGERPRINT')
+                  common=['gpg','--batch','--yes','--pinentry-mode','loopback','--passphrase-fd','0','--local-user',fingerprint,'--digest-algo','SHA256']
+                  password=(os.environ.get('REPOMGR_SIGNING_PASSPHRASE','')+'\n').encode()
+                  subprocess.run(common+['--armor','--detach-sign','--output','Release.gpg','Release'],input=password,env=env,check=True,timeout=90)
+                  subprocess.run(common+['--clearsign','--output','InRelease','Release'],input=password,env=env,check=True,timeout=90)
+          PYRELEASE
           if [ ! -f index.html ]; then
-            printf '<!doctype html><meta charset=utf-8><meta name=viewport content=width=device-width><title>%s</title><h1>%s</h1><p>添加此地址到 Sileo。</p>' "${GITHUB_REPOSITORY##*/}" "${GITHUB_REPOSITORY##*/}" > index.html
+            printf '<!doctype html><meta charset=utf-8><meta name=viewport content=width=device-width><title>APT Repository</title><h1>APT Repository</h1><p>添加此地址到 Sileo。</p>' > index.html
           fi
       - name: Record publication provenance
-        if: steps.transfer.outputs.has_changes == 'true'
+        if: github.ref_type == 'branch' && github.ref_name == github.event.repository.default_branch && steps.transfer.outputs.has_changes == 'true'
         shell: bash
         run: |
           python3 - <<'PYPROVENANCE'
@@ -207,12 +323,12 @@ jobs:
           with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as summary: summary.write('\nPublication commit: `'+manifest['commit']+'`\nIndex SHA256: `'+manifest['indexSHA256']+'`\n')
           PYPROVENANCE
       - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
-        if: steps.transfer.outputs.has_changes == 'true'
+        if: github.ref_type == 'branch' && github.ref_name == github.event.repository.default_branch && steps.transfer.outputs.has_changes == 'true'
         with:
           path: public
       - uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
         id: deployment
-        if: steps.transfer.outputs.has_changes == 'true'
+        if: github.ref_type == 'branch' && github.ref_name == github.event.repository.default_branch && steps.transfer.outputs.has_changes == 'true'
       - name: Summarize per-file transfer outcome
         if: always()
         shell: bash
