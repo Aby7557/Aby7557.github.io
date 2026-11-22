@@ -1,0 +1,49 @@
+{
+  "icon" : "https:\/aby7557.github.io\/depictions\/com.abyss.renet\/icon.png",
+  "tabs" : [
+    {
+      "tabname" : "详情",
+      "class" : "DepictionStackView",
+      "views" : [
+        {
+          "class" : "DepictionHeaderView",
+          "title" : "联网修复"
+        },
+        {
+          "class" : "DepictionMarkdownView",
+          "useSpacing" : true,
+          "markdown" : "Per-app WLAN and cellular permission repair for iOS 16 and 17."
+        },
+        {
+          "class" : "DepictionSeparatorView"
+        },
+        {
+          "class" : "DepictionHeaderView",
+          "title" : "插件信息"
+        },
+        {
+          "class" : "DepictionTableTextView",
+          "title" : "版本",
+          "text" : "0.0.1-1"
+        },
+        {
+          "class" : "DepictionTableTextView",
+          "title" : "作者",
+          "text" : "Ty"
+        },
+        {
+          "class" : "DepictionTableTextView",
+          "title" : "依赖",
+          "text" : "firmware (>= 16.0), firmware (<< 18.0)"
+        }
+      ]
+    }
+  ],
+  "class" : "DepictionTabView",
+  "repomgr" : {
+    "Author" : "Ty",
+    "Name" : "联网修复",
+    "Description" : "Per-app WLAN and cellular permission repair for iOS 16 and 17."
+  },
+  "minVersion" : "0.4"
+}
