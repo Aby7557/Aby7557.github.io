@@ -1,5 +1,5 @@
 # RepoMgr-Transfer-API: 1
-# RepoMgr-Transfer-Template: 10
+# RepoMgr-Transfer-Template: 12
 name: Cloud transfer deb
 run-name: "RepoMgr ${{ inputs.task_id }}"
 
@@ -45,6 +45,8 @@ jobs:
         with:
           ref: ${{ github.ref_name }}
           fetch-depth: 0
+      - name: Install transfer and publisher tools
+        run: sudo apt-get update && sudo apt-get install -y dpkg xz-utils bzip2 gzip zstd dpkg-dev gnupg
       - name: Download and commit
         id: transfer
         shell: bash
@@ -54,7 +56,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 <<'PYTRANSFER'
-          import json, os, re, subprocess, tempfile, hashlib, socket, ipaddress
+          import json, os, re, subprocess, tempfile, hashlib, socket, ipaddress, tarfile, threading, signal, sys
           from urllib.parse import urlsplit, urljoin
           from pathlib import Path
 
@@ -89,6 +91,83 @@ jobs:
                   return
               raise ValueError('redirect_limit')
 
+          def validate_compressed_member(path, timeout=20):
+              data=Path(path).read_bytes(); offset=8; payload=None
+              if not data.startswith(b'!<arch>\n'): raise ValueError('invalid_archive')
+              while offset<len(data):
+                  if len(data)-offset<60: raise ValueError('invalid_archive')
+                  header=data[offset:offset+60]
+                  if header[58:60]!=b'`\n': raise ValueError('invalid_archive')
+                  try: size=int(header[48:58].decode('ascii').strip())
+                  except (ValueError,UnicodeDecodeError): raise ValueError('invalid_archive') from None
+                  if size<0 or offset+60+size>len(data): raise ValueError('invalid_archive')
+                  try: name=header[:16].decode('ascii','strict').strip().rstrip('/')
+                  except UnicodeDecodeError: raise ValueError('invalid_archive') from None
+                  if name.startswith('#1/'): raise ValueError('invalid_archive')
+                  if name.startswith('data.tar'):
+                      if payload is not None: raise ValueError('invalid_payload')
+                      payload=(name,data[offset+60:offset+60+size])
+                  offset+=60+size
+                  if size%2:
+                      if offset>=len(data) or data[offset:offset+1]!=b'\n': raise ValueError('invalid_archive')
+                      offset+=1
+              if payload is None: raise ValueError('invalid_payload')
+              name,compressed=payload; suffix=name[len('data.tar'):]
+              tools={'.gz':['gzip','-t'],'.xz':['xz','-t'],'.lzma':['xz','-t'],'.bz2':['bzip2','-t'],'.zst':['zstd','-q','-t']}
+              if suffix=='': return
+              if suffix not in tools: raise ValueError('invalid_payload')
+              fd,temp=tempfile.mkstemp(prefix='repomgr-payload-',suffix=suffix); os.close(fd)
+              try:
+                  Path(temp).write_bytes(compressed)
+                  subprocess.run(tools[suffix]+[temp],check=True,timeout=timeout,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+              except (OSError,subprocess.SubprocessError): raise ValueError('invalid_payload') from None
+              finally: Path(temp).unlink(missing_ok=True)
+
+          def validate_payload(path, maximum_bytes=512*1024*1024, maximum_entries=100000, timeout=30):
+              # dpkg handles the supported compression formats; never extract package paths.
+              process=subprocess.Popen(['dpkg-deb','--fsys-tarfile',str(path)],stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,start_new_session=True)
+              expired=threading.Event()
+              def kill():
+                  try:
+                      if sys.platform=='linux': os.killpg(process.pid,signal.SIGKILL)
+                      else: process.kill()
+                  except ProcessLookupError: pass
+              def timed_out():
+                  expired.set(); kill()
+              timer=threading.Timer(timeout,timed_out); timer.daemon=True; timer.start()
+              class BoundedStream:
+                  def __init__(self): self.total=0
+                  def read(self,size=-1):
+                      chunk=process.stdout.read(min(size if size>=0 else 32768,32768))
+                      self.total+=len(chunk)
+                      if self.total>maximum_bytes: raise ValueError('payload_resource_limit')
+                      return chunk
+              stream=BoundedStream()
+              try:
+                  entries=0; expanded=0
+                  with tarfile.open(fileobj=stream,mode='r|') as archive:
+                      for member in archive:
+                          entries+=1; expanded+=member.size
+                          if entries>maximum_entries or member.size<0 or expanded>maximum_bytes:
+                              raise ValueError('payload_resource_limit')
+                          if member.isfile():
+                              with archive.extractfile(member) as content:
+                                  while content.read(32768): pass
+                  # Drain after the tar end marker so decompression/CRC errors surface.
+                  while stream.read(32768): pass
+                  status=process.wait()
+                  if expired.is_set(): raise ValueError('payload_timeout')
+                  if status or not entries: raise ValueError('invalid_payload')
+              except Exception as error:
+                  if expired.is_set(): raise ValueError('payload_timeout') from None
+                  if isinstance(error,ValueError) and str(error)=='payload_resource_limit': raise
+                  raise ValueError('invalid_payload') from None
+              finally:
+                  timer.cancel()
+                  if process.poll() is None: kill()
+                  process.stdout.close()
+                  process.wait()
+
           def transfer(items):
               if not isinstance(items,list) or not 0<len(items)<=20: raise ValueError('invalid_batch')
               results=[]; seen=set()
@@ -107,16 +186,19 @@ jobs:
                       data=Path(tmp).read_bytes(); digest=hashlib.sha256(data).hexdigest()
                       if len(data)>41943040 or not data.startswith(b'!<arch>\n'): raise ValueError('invalid_archive')
                       if expected.lower()!=digest: raise ValueError('checksum_mismatch')
+                      validate_compressed_member(tmp)
                       fields=[subprocess.check_output(['dpkg-deb','-f',tmp,k],text=True,stderr=subprocess.PIPE).strip() for k in ['Package','Version','Architecture']]
                       if not all(fields) or not re.fullmatch(r'[a-z0-9][a-z0-9+.-]*',fields[0]): raise ValueError('invalid_control')
+                      validate_payload(tmp)
                       dest=Path('debs')/re.sub(r'[^A-Za-z0-9._+-]','_', '_'.join(fields)+'.deb')
                       if len(dest.name)>240: raise ValueError('invalid_control')
+                      result['repo_path']=dest.as_posix(); result['sha256']=digest
                       if dest.exists():
                           if hashlib.sha256(dest.read_bytes()).hexdigest()!=digest: raise ValueError('filename_conflict')
                           result['status']='skipped'
                       else: dest.write_bytes(data); result['status']='success'
                   except Exception as error:
-                      allowed={'unsafe_url','dns_failed','download_failed','cloudflare_challenge','http_forbidden','redirect_limit','invalid_input','invalid_filename','invalid_sha256','invalid_archive','checksum_mismatch','invalid_control','filename_conflict'}
+                      allowed={'unsafe_url','dns_failed','download_failed','cloudflare_challenge','http_forbidden','redirect_limit','invalid_input','invalid_filename','invalid_sha256','invalid_archive','checksum_mismatch','invalid_control','invalid_payload','payload_resource_limit','payload_timeout','filename_conflict'}
                       result['error']=str(error) if isinstance(error,ValueError) and str(error) in allowed else 'transfer_failed'
                   finally:
                       if tmp: Path(tmp).unlink(missing_ok=True)
@@ -145,9 +227,52 @@ jobs:
             git fetch origin "$GITHUB_REF_NAME"
             # Never overwrite concurrent changes. A conflicting same-path update
             # fails visibly instead of silently replacing another uploader's file.
-            git rebase "origin/$GITHUB_REF_NAME" || { git rebase --abort; exit 1; }
+            if ! git rebase "origin/$GITHUB_REF_NAME"; then
+              git rebase --abort
+              python3 - "$TASK_ID" <<'PYCONFLICT'
+          import json,sys
+          from pathlib import Path
+          result=Path('.repomgr-results',sys.argv[1]+'.json')
+          rows=json.loads(result.read_text(encoding='utf-8'))
+          for row in rows:
+              if row.get('status') in ('success','skipped'):
+                  row['status']='failure'; row['error']='repository_rebase_conflict'
+          result.write_text(json.dumps(rows,ensure_ascii=False),encoding='utf-8')
+          PYCONFLICT
+              exit 1
+            fi
+            python3 - "$TASK_ID" <<'PYTREE'
+          import hashlib,json,subprocess,sys
+          from pathlib import Path
+          result=Path('.repomgr-results',sys.argv[1]+'.json')
+          rows=json.loads(result.read_text(encoding='utf-8')); changed=False
+          for row in rows:
+              if row.get('status') not in ('success','skipped'): continue
+              try: data=subprocess.check_output(['git','show','HEAD:'+row['repo_path']],stderr=subprocess.DEVNULL)
+              except (subprocess.CalledProcessError,KeyError): data=None
+              if data is None or hashlib.sha256(data).hexdigest()!=row.get('sha256'):
+                  row['status']='failure'; row['error']='final_tree_conflict'; changed=True
+          if changed:
+              result.write_text(json.dumps(rows,ensure_ascii=False),encoding='utf-8')
+              subprocess.run(['git','add',str(result)],check=True)
+              subprocess.run(['git','commit','-m','Record cloud transfer tree conflict'],check=True,stdout=subprocess.DEVNULL)
+              raise SystemExit('Rebased repository tree no longer matches the verified transfer bytes')
+          PYTREE
           done
-          [ "$pushed" = true ] || { echo 'Repository changed repeatedly; retry the task.' >&2; exit 1; }
+          if [ "$pushed" != true ]; then
+            python3 - "$TASK_ID" <<'PUSHFAIL'
+          import json,sys
+          from pathlib import Path
+          result=Path('.repomgr-results',sys.argv[1]+'.json')
+          rows=json.loads(result.read_text(encoding='utf-8'))
+          for row in rows:
+              if row.get('status') in ('success','skipped'):
+                  row['status']='failure'; row['error']='repository_push_failed'
+          result.write_text(json.dumps(rows,ensure_ascii=False),encoding='utf-8')
+          PUSHFAIL
+            echo 'Repository changed repeatedly; retry the task.' >&2
+            exit 1
+          fi
       - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
         id: pages
         if: github.ref_type == 'branch' && github.ref_name == github.event.repository.default_branch && steps.transfer.outputs.has_changes == 'true'
@@ -157,6 +282,7 @@ jobs:
           REPOMGR_SIGNING_KEY: ${{ secrets.REPOMGR_SIGNING_KEY }}
           REPOMGR_SIGNING_PASSPHRASE: ${{ secrets.REPOMGR_SIGNING_PASSPHRASE }}
           REPOMGR_SIGNING_FINGERPRINT: ${{ vars.REPOMGR_SIGNING_FINGERPRINT }}
+          REPOMGR_VALIDITY_DAYS: ${{ vars.REPOMGR_VALIDITY_DAYS || '7' }}
         if: github.ref_type == 'branch' && github.ref_name == github.event.repository.default_branch && steps.transfer.outputs.has_changes == 'true'
         shell: bash
         run: |
@@ -218,7 +344,7 @@ jobs:
           # Always regenerate compressed variants, including ones copied from an old source.
           python3 - <<'PYRELEASE'
           import bz2, gzip, hashlib, lzma, os, re, subprocess, tempfile
-          from datetime import datetime, timezone
+          from datetime import datetime, timedelta, timezone
           from email.utils import format_datetime
           from pathlib import Path
           root=Path('.')
@@ -262,12 +388,17 @@ jobs:
               field=match[1].lower()
               if field in seen: raise SystemExit('Duplicate Release field: '+field)
               seen.add(field)
-              skip=field in ('md5sum','sha1','sha256','sha512','date')
+              skip=field in ('md5sum','sha1','sha256','sha512','date','valid-until')
               if not skip: identity.append(line)
           if not identity:
               name=os.environ.get('GITHUB_REPOSITORY','repository').rsplit('/',1)[-1]
               identity=[f'Origin: {name}',f'Label: {name}','Suite: stable','Codename: sileo','Architectures: iphoneos-arm64 iphoneos-arm64e','Components: main',f'Description: {name}']
           identity.append('Date: '+format_datetime(datetime.now(timezone.utc),usegmt=True))
+          try:
+              validity_days=int(os.environ.get('REPOMGR_VALIDITY_DAYS','7'))
+          except ValueError: raise SystemExit('REPOMGR_VALIDITY_DAYS must be an integer from 1 to 90')
+          if not 1<=validity_days<=90: raise SystemExit('REPOMGR_VALIDITY_DAYS must be an integer from 1 to 90')
+          identity.append('Valid-Until: '+format_datetime(datetime.now(timezone.utc)+timedelta(days=validity_days),usegmt=True))
           # Hash repository index files, never Release itself, signatures, packages or assets.
           indexes=[]
           for p in sorted(root.rglob('*')):
