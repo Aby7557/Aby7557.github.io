@@ -1,0 +1,64 @@
+{
+  "icon" : "https:\/\/getsileo.app\/img\/icon.png",
+  "tabs" : [
+    {
+      "tabname" : "详情",
+      "class" : "DepictionStackView",
+      "views" : [
+        {
+          "class" : "DepictionHeaderView",
+          "title" : "Sileo"
+        },
+        {
+          "class" : "DepictionMarkdownView",
+          "useSpacing" : true,
+          "markdown" : "A modern APT package manager frontend"
+        },
+        {
+          "class" : "DepictionSeparatorView"
+        },
+        {
+          "class" : "DepictionHeaderView",
+          "title" : "插件信息"
+        },
+        {
+          "class" : "DepictionTableTextView",
+          "title" : "版本",
+          "text" : "2.5.1-17"
+        },
+        {
+          "class" : "DepictionTableTextView",
+          "title" : "作者",
+          "text" : "wwg151 <wwg151@users.noreply.github.com>"
+        },
+        {
+          "class" : "DepictionTableTextView",
+          "title" : "依赖",
+          "text" : "firmware (>= 11.0), firmware(>=12.2) | org.swift.libswift (>=5.0), coreutils (>= 8.30-1), dpkg (>= 1.19.4-1), apt (>= 1.8.2), libzstd1"
+        }
+      ]
+    },
+    {
+      "tabname" : "更新记录",
+      "class" : "DepictionStackView",
+      "views" : [
+        {
+          "class" : "DepictionSubheaderView",
+          "title" : "2.5.1-17"
+        },
+        {
+          "class" : "DepictionMarkdownView",
+          "useSpacing" : true,
+          "markdown" : "M哥修改版"
+        }
+      ]
+    }
+  ],
+  "class" : "DepictionTabView",
+  "repomgr" : {
+    "Author" : "wwg151 <wwg151@users.noreply.github.com>",
+    "Name" : "Sileo",
+    "Description" : "A modern APT package manager frontend"
+  },
+  "minVersion" : "0.4"
+}
