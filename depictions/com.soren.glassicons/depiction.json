@@ -1,0 +1,49 @@
+{
+  "icon" : "data:image\/png;base64,%0AiVBORw0KGgoAAAANSUhEUgAAAB0AAAAdCAYAAABWk2cPAAAGDUlEQVR4nKWXTWxcVxXH\/\/9z73vz%0A4dhO4thJSCIjGSWBIFBRK1TxnbQbJGBFP6BCrBASO6QKCGLBggUIqapEW8THDorIBom2sGIBEqhB%0AFUmorYKatG5I3YTEiWfGM+\/r3nNYvJl4HDtGhCedkWbuvef3\/ufcc+4dAoCZkaS9+NbVh6aEj5rh%0ARDROqAaaGfG\/PqQ5ceaIvhcsFpBfnzw8+4cRh2fOnHGP3LolLz38mW9WIX55ZVDszdTSaJbgXoBj%0AYAKhRVYHW43V2V3tn33n4qs\/+Nr167XT37z+9unOID\/9z84gSZIkFRhg94wbA9duijJUC1PNsLB3%0A93dPzs9+nz899+YnU+jPX7nWOdJo+MRiNID3rnDLYybOsZ9X4b7ZqSuH97S\/5CecPn7+nc6+LFpS%0A9nMDyR1U7qR\/+xclCK1MxflXr63NzrUbX\/BZHj6w0s0aEAeY3kUhYbX4HSNAGGDbvhcpil4Zkn\/3%0ABvf59ayc7A0q51yEbbPASKhabHnJRBhtmCmSYD0GAqZmUgRtgkzEbEtIhERWBdcdlJM+r9QGeQnn%0A3J1QU3NsuHRtbsKvhyo0YqkkVEQERVUhLyq0mylExLxzusun3RtZaHZDOeMZN4GHUBRlMF9VEf2s%0Agnc6DjUjmYp1GxH62ttXDw\/6A5gqnAj6eYGFmRY+fPQQzv7jMt7qBqRJgrTVxKHZmY4T3OyFsFdq%0AhxyHlpXBhyoiywO8s9tQEgxR48Hd7d6l5ZVDvZs3zalCRNDJSxyda+Prn\/4Y\/n7xCi5fuYEIj5zA%0AAEC2nk0fXzjwzuqgKCEuHeVYSGRlQFVFSBUi8qIaN8uKCIaQze9Kmp3VDhAUBsdOv+TCvgk++dgp%0Ann3tMp\/67SvMoqcaGCIIBTqrHRxsSLtJ6\/ezgLyobNx\/GSN8qBTFICD6DaVGAVBpw4yhjEidoNMv%0AcHx\/G994\/CTOLi3jx78\/h7TZBs0QotUxJFFVEakZY15anhGeG0qLskIsFD6GiKIIiHEMCgFRoqoi%0AAEG3n+PYgTa+9cVTOLu0jOd+VwOhhoBR2gxGwCIQgiLPShSFQ9wEDQi1UkNVBNgYVCEQCyCI3qDE%0A+w+2cfqJU3h5aRnPvXQeSaMNmCEasFG6dS3rsFRDFVHlBpMNaFUGxErhoypCGQHFGNSgVGRFwLH9%0AE\/j2E5\/Ay4vLePbF80ibLYgZdJseYLC6vxgQSkVVKih1GxMSoYyIQeERAQQDNnUTAwUoyxIfPXEE%0AF15fwTMvnEej1YbQYMZtWxNHug2waEAAIGODwQAFPAyg1jaqZgIwU7TTBv6yuIxrnRxpcwKOuCvw%0ANpQGgqACosSokZMbDC8G0LZCQSBJHN5YDWj6BMkwTDudP2Tdf0lCFKDaRsZlKM4AD1NAh+RRc4DB%0ATFmW0RpJArEIBXbu9sNxIVFWilgpqA6AbkxQA3SYU+pQwZApBPIstJYuXe2l3qMoI7zIfz3WVc0a%0AqefFf13PbnUH0z6dBLR2TWxEU0ZfNlk0Eyb+zav91qF9U50kbTLC1Wbb2PB3+lSOzE2vX1nNRNU3%0Axcw2+wXEAA\/dohSA0YuzfuCe1bXe6vy0W6ksaUVVEW7NqpqZUCx1lt3q9t1an7OJJEDc2AIEILc3%0AUn2+Qnjn+StENFxbWZu5mq8VE4kNSARgm+1rNJDsl7bb0qlW2poCKRgvZrkdXtK30qTnKdG0Lp\/N%0ADom0OQlL240sVA2Ybntf4fDTT6YQcfWcOycqIaBONX3Pt1J3YXayeWLlZtZIHc1s6yYlHBLvbMd6%0AqUmEbrvLLZhydzutDs7s+ptkhT7\/wLG5G2VeBUehGGxUT3dsMDLa3U2Nm+ZvrLdEhIP1PD5wfO7G%0A\/IHpX8r3vvqRPy28a89PTn3ocNXp5iEGUihwEDj+HzZcb0reWsvDg+87oA\/fP\/+jz338PX+ub\/iP%0APMOnn3\/qycVL17\/y16Vr+1a7ZRKjOgA7XUfv\/tTxNRGJ0xM+3P\/eudWHHnz3sy+sL\/7w86Ph0X+M%0Ap39x7lOG+OiNtcEHszxORFXunMi7Mc0gYruarr9\/pn1hfv\/Urz578ugf68ZN+w+vIrXNswHLUAAA%0AAABJRU5ErkJggg==",
+  "tabs" : [
+    {
+      "tabname" : "详情",
+      "class" : "DepictionStackView",
+      "views" : [
+        {
+          "class" : "DepictionHeaderView",
+          "title" : "GlassIcons"
+        },
+        {
+          "class" : "DepictionMarkdownView",
+          "useSpacing" : true,
+          "markdown" : "应用程序图标的微妙玻璃边缘和光泽（iOS 15-17，RootHide）"
+        },
+        {
+          "class" : "DepictionSeparatorView"
+        },
+        {
+          "class" : "DepictionHeaderView",
+          "title" : "插件信息"
+        },
+        {
+          "class" : "DepictionTableTextView",
+          "title" : "版本",
+          "text" : "0.11"
+        },
+        {
+          "class" : "DepictionTableTextView",
+          "title" : "作者",
+          "text" : "Ning"
+        },
+        {
+          "class" : "DepictionTableTextView",
+          "title" : "依赖",
+          "text" : "firmware (>= 15.0), firmware (<< 18.0), mobilesubstrate, preferenceloader"
+        }
+      ]
+    }
+  ],
+  "class" : "DepictionTabView",
+  "repomgr" : {
+    "Author" : "Ning",
+    "Name" : "GlassIcons",
+    "Description" : "应用程序图标的微妙玻璃边缘和光泽（iOS 15-17，RootHide）"
+  },
+  "minVersion" : "0.4"
+}
